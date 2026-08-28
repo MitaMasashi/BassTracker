@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bass Practice Lab</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><h1>Bass Practice Lab</h1><small>Skeleton v0.1</small></div>
+      <nav aria-label="主な画面">
+        <button class="nav-item active" data-screen="library">ライブラリ</button>
+        <button class="nav-item" data-screen="import">練習曲を追加</button>
+        <button class="nav-item" data-screen="transcribe">耳コピ</button>
+        <button class="nav-item" data-screen="practice">練習・録音</button>
+        <button class="nav-item" data-screen="analysis">演奏解析</button>
+        <button class="nav-item" data-screen="history">履歴</button>
+      </nav>
+      <p class="sidebar-note">PracticeTrackを中心に、取込・解析・録音・評価を管理します。</p>
+    </aside>
+
+    <main class="main-content">
+      <section id="library" class="screen active">
+        <header><div><h2>ライブラリ</h2><p>登録済みPracticeTrackを管理します。</p></div><button class="button primary" data-go="import">＋ 練習曲を追加</button></header>
+        <div class="layout two-columns"><div class="card"><h3>PracticeTrack一覧</h3><div class="track selected"><span class="art">♫</span><div><strong>Sample Song Official Video</strong><p>曲名: Sample Song / Artist A</p><span class="badge">YouTube</span><span class="badge success">Ready</span></div><span>Em / 118 BPM</span></div><div class="track"><span class="art">♪</span><div><strong>Practice Track 01</strong><p>ローカル音声ファイル</p><span class="badge muted">Local</span><span class="badge warning">Partial</span></div><span>A / 132 BPM</span></div></div><div class="stack"><div class="card"><h3>選択中のPracticeTrack</h3><dl><dt>表示名</dt><dd>Sample Song Official Video</dd><dt>Source</dt><dd>YouTube</dd><dt>BPM / Key</dt><dd>118 / E minor</dd><dt>Status</dt><dd><span class="badge success">ready</span></dd></dl><button class="button" data-go="transcribe">耳コピを開く</button> <button class="button" data-go="practice">練習する</button></div><div class="card"><h3>Processing Jobs</h3><ul class="jobs"><li>Import <b>完了（モック）</b></li><li>Stem分離 <b>完了（モック）</b></li><li>BPM / Key / Chord / Pitch <b>未実装</b></li></ul></div></div></div>
+      </section>
+
+      <section id="import" class="screen">
+        <header><div><h2>練習曲を追加</h2><p>取込後は共通のsource_audioとして扱います。</p></div></header>
+        <div class="layout two-columns"><div class="card"><h3>取込元</h3><div class="tabs"><button class="tab active" data-import="local">音声ファイル</button><button class="tab" data-import="youtube">YouTube URL</button></div><form id="import-form"><div id="local-fields"><label>音声ファイル<input type="file" accept="audio/*" disabled></label></div><div id="youtube-fields" hidden><label>YouTube URL<input type="url" placeholder="https://www.youtube.com/watch?v=..."></label></div><label>表示名<input name="display_title" value="Sample Song"></label><label>曲名<input placeholder="任意"></label><label>アーティスト<input placeholder="任意"></label><button class="button primary" type="submit">登録して解析を開始</button></form><p id="import-message" class="notice">取込処理は未実装です。現在は画面遷移・API境界のみを用意しています。</p></div><div class="card"><h3>想定フロー</h3><ol><li>PracticeTrack / MediaSourceを作成</li><li>source_audioを生成</li><li>Stem分離</li><li>BPM・Key・Chord・Pitchを解析</li></ol></div></div>
+      </section>
+
+      <section id="transcribe" class="screen">
+        <header><div><h2>耳コピ</h2><p>Sample Song Official Video</p></div></header>
+        <div class="layout two-columns"><div class="card"><div class="tabs"><button class="tab active">Source</button><button class="tab">Bass Solo</button><button class="tab">Bass Mute</button></div><div class="chords"><span>Em</span><span>C</span><span class="current">G</span><span>D</span><span>Em</span><span>C</span><span>Am</span><span>B7</span></div><div class="waveform"><i></i><em>A-B Loop</em></div><div class="transport"><button>◀</button><button class="button primary">▶</button><button>▶|</button><span>01:24.2 / 03:42.0</span></div><div class="controls"><label>速度 <select><option>50%</option><option>75%</option><option selected>100%</option></select></label><button>A設定</button><button>B設定</button><button>A-B Loop</button></div></div><div class="stack"><div class="card"><h3>楽曲解析（モック）</h3><dl><dt>Key</dt><dd>E minor (72)</dd><dt>BPM</dt><dd>118</dd><dt>拍子</dt><dd>4/4</dd><dt>現在のChord</dt><dd>G</dd></dl></div><div class="card"><h3>Pitch Hint（モック）</h3><p>E2 / 0.78</p><p>E3 / 0.14</p><p>B1 / 0.05</p><small>完全自動採譜ではなく、耳コピの補助情報として表示します。</small></div></div></div>
+      </section>
+
+      <section id="practice" class="screen">
+        <header><div><h2>練習・録音</h2><p>Bass Muteをローカル再生し、演奏を録音します。</p></div><button class="button">Latency Calibration</button></header>
+        <div class="layout two-columns"><div class="card"><div class="waveform"><i></i><em>A-B Loop</em></div><div class="controls"><label>伴奏 <select><option>Bass Mute</option><option>Source</option></select></label><label>速度 <select><option>75%</option><option>90%</option><option>100%</option></select></label><label><input type="checkbox" checked> A-Bループ</label></div><p class="notice">再生・録音処理は未実装です。実装時はDirect Monitorを前提とします。</p></div><div class="card record"><h3>録音</h3><p>Input: Audio Interface / Channel 1</p><div class="meter"><span></span></div><button class="record-button" disabled>REC</button><strong>00:00.0</strong><dl><dt>Calibration</dt><dd>26.8 ms（モック）</dd><dt>Monitor</dt><dd>Direct Monitor 推奨</dd></dl></div></div>
+      </section>
+
+      <section id="analysis" class="screen">
+        <header><div><h2>演奏解析</h2><p>録音セッションを選択して、後から解析します。</p></div></header>
+        <div class="layout two-columns"><div class="card"><h3>録音セッション</h3><button class="session selected">2026/08/28 09:42<br><small>Sample Song / 01:20–01:32 / 100%</small></button><button class="session">2026/08/28 09:31<br><small>Sample Song / 01:20–01:32 / 90%</small></button></div><div class="card"><h3>解析Context（モック）</h3><dl><dt>Reference</dt><dd>stem_bass.wav</dd><dt>Section</dt><dd>01:20.000–01:32.000</dd><dt>Latency Offset</dt><dd>26.8 ms</dd><dt>Sample Rate</dt><dd>48000 Hz</dd></dl><button class="button primary" disabled>解析を開始</button></div></div><div class="metrics"><article><small>平均タイミング</small><b>+12 ms</b></article><article><small>平均絶対誤差</small><b>24 ms</b></article><article><small>音量ばらつき</small><b>2.1 dB</b></article></div><p class="notice">Timing・Volume・Missing / Extraの評価ロジックは未実装です。</p>
+      </section>
+
+      <section id="history" class="screen"><header><div><h2>履歴</h2><p>RecordingSession / AnalysisResultの比較履歴です。</p></div></header><div class="card table-wrap"><table><thead><tr><th>日時</th><th>PracticeTrack</th><th>区間</th><th>速度</th><th>Timing MAE</th><th>Missing</th></tr></thead><tbody><tr><td>2026-08-28</td><td>Sample Song</td><td>01:20–01:32</td><td>100%</td><td>24 ms</td><td>7</td></tr><tr><td>2026-08-28</td><td>Sample Song</td><td>01:20–01:32</td><td>90%</td><td>31 ms</td><td>10</td></tr></tbody></table></div><p class="notice">履歴は表示モックです。永続化・比較グラフは未実装です。</p></section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
