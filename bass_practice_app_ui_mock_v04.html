@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bass Practice Lab - UI Mock v0.4</title>
+<style>
+:root{--bg:#f4f6f8;--panel:#fff;--text:#1b232b;--muted:#6f7a84;--line:#d9e0e6;--accent:#2d6cdf;--good:#2f8f62;--warn:#c98518;--bad:#c94b4b;--shadow:0 8px 24px rgba(22,32,44,.07);--radius:14px}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}button,input,select{font:inherit}
+.app{min-height:100vh;display:grid;grid-template-columns:230px 1fr}.sidebar{background:#17202a;color:#eaf0f6;padding:20px 14px;display:flex;flex-direction:column;gap:16px}
+.brand{padding:6px 10px 18px;border-bottom:1px solid rgba(255,255,255,.1)}.brand h1{margin:0;font-size:18px}.brand small{color:#9fb0bf}
+.nav{display:grid;gap:8px}.nav button{border:0;text-align:left;color:#c9d5df;background:transparent;padding:11px 12px;border-radius:10px;cursor:pointer}
+.nav button.active,.nav button:hover{color:#fff;background:rgba(255,255,255,.09)}.side-note{margin-top:auto;color:#9fb0bf;font-size:12px;line-height:1.55;padding:0 10px}
+.main{padding:22px;overflow:auto}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.topbar h2{margin:0 0 4px;font-size:22px}.muted{color:var(--muted)}
+.top-actions{display:flex;gap:10px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;padding:9px 13px;border-radius:10px;cursor:pointer}.btn.primary{border-color:var(--accent);background:var(--accent);color:#fff}
+.screen{display:none}.screen.active{display:block}.grid{display:grid;gap:16px}.cols2{grid-template-columns:minmax(0,1.55fr) minmax(300px,.85fr)}.cols3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}.card h3{margin:0 0 12px;font-size:15px}
+.track-list{display:grid;gap:10px}.track-item{display:grid;grid-template-columns:58px 1fr auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px}
+.thumb{width:58px;height:58px;border-radius:10px;background:linear-gradient(135deg,#d9e7ff,#f5f8fd);display:grid;place-items:center;font-size:20px}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;margin-right:4px;background:#edf3ff;color:#315fbc}.badge.good{background:#e8f4ee;color:#2f7755}.badge.warn{background:#fff5e6;color:#9a6818}.badge.gray{background:#eef1f3;color:#68727b}
+.info-table{width:100%;border-collapse:collapse;font-size:14px}.info-table td{padding:9px 0;border-bottom:1px solid var(--line)}.info-table td:first-child{color:var(--muted);width:42%}
+.source-box{border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px;background:#fbfcfd}.form-row{display:grid;grid-template-columns:140px 1fr;gap:10px;align-items:center;margin:10px 0}
+.form-row input,.form-row select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}.import-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.choice{border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;background:#fff}.choice.active{outline:2px solid #8eb1f5;background:#f6f9ff}
+.job-list{display:grid;gap:8px}.job{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px}
+.progress{height:8px;border-radius:999px;background:#edf1f4;overflow:hidden}.progress span{display:block;height:100%;background:#6a98e9}
+.wave-wrap{border:1px solid var(--line);background:#fbfcfd;border-radius:12px;padding:12px}.chords,.pitchline{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;text-align:center}
+.chords{margin-bottom:8px;font-size:13px}.chord{padding:7px 2px;border-radius:8px;background:#eff4fa}.chord.current{background:#dce8ff;outline:2px solid #8eb1f5}
+.pitchline{margin-top:8px;font-size:12px}.pitch{padding:5px 2px;border-radius:7px;background:#f5f0ff;color:#6556a7}
+.wave{height:110px;border-radius:8px;position:relative;overflow:hidden;background:linear-gradient(to bottom,transparent 49%,#dfe5ea 50%,transparent 51%),repeating-linear-gradient(90deg,transparent 0 8px,rgba(45,108,223,.22) 8px 11px,transparent 11px 18px,rgba(45,108,223,.38) 18px 23px,transparent 23px 28px)}
+.playhead{position:absolute;left:37%;top:0;bottom:0;width:2px;background:var(--accent)}.ab{position:absolute;left:22%;right:38%;top:0;bottom:0;background:rgba(45,108,223,.08);border-left:2px solid #5d8be2;border-right:2px solid #5d8be2}
+.transport,.control-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.transport button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff}.transport .play{background:var(--accent);color:#fff;border-color:var(--accent)}
+.segment{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}.segment button{border:0;border-right:1px solid var(--line);background:#fff;padding:8px 10px}.segment button.active{background:#eaf1ff;color:#234f9f}
+.record-panel{text-align:center;padding:26px 16px}.record-button{width:94px;height:94px;border-radius:50%;border:8px solid #f7dede;background:#d65353;color:#fff;font-weight:700;margin:12px auto 18px;display:grid;place-items:center}
+.level{width:100%;height:14px;background:#edf1f4;border-radius:999px;overflow:hidden;margin:12px 0}.level span{display:block;height:100%;width:68%;background:linear-gradient(90deg,#79b798 0 70%,#d5aa55 70% 88%,#d96d6d 88%)}
+.stat{display:grid;gap:5px}.stat .value{font-size:28px;font-weight:700}.stat.good .value{color:var(--good)}.stat.warn .value{color:var(--warn)}
+.chart{height:180px;border-radius:12px;border:1px solid var(--line);position:relative;overflow:hidden;background:linear-gradient(to bottom,transparent 24%,#edf0f2 25%,transparent 26%,transparent 49%,#edf0f2 50%,transparent 51%,transparent 74%,#edf0f2 75%,transparent 76%)}.chart .zero{position:absolute;top:50%;left:0;right:0;height:2px;background:#acb7c0}.dot{width:8px;height:8px;border-radius:50%;position:absolute;background:var(--accent)}
+.history-table{width:100%;border-collapse:collapse}.history-table th,.history-table td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}.history-table th{color:var(--muted);font-weight:600}
+.hint{border-left:4px solid #9ab8ef;background:#f3f7ff;padding:10px 12px;border-radius:8px;color:#42556a;font-size:13px}.callout{border:1px dashed #bfc9d3;border-radius:12px;padding:14px;background:#fcfdfd}
+.session-card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px}.session-card.active{outline:2px solid #8eb1f5;background:#f6f9ff}.kv{display:grid;grid-template-columns:150px 1fr;gap:8px;font-size:14px;margin:6px 0}.kv span:first-child{color:var(--muted)}
+@media(max-width:980px){.app{grid-template-columns:1fr}.sidebar{position:sticky;top:0;z-index:10;flex-direction:row;align-items:center;overflow-x:auto}.brand{min-width:170px;border:0;padding-bottom:6px}.nav{display:flex}.side-note{display:none}.cols2,.cols3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+<div class="brand"><h1>Bass Practice Lab</h1><small>UI Mock v0.4</small></div>
+<nav class="nav">
+<button class="active" data-screen="library">ライブラリ</button>
+<button data-screen="import">練習曲追加</button>
+<button data-screen="transcribe">耳コピ</button>
+<button data-screen="practice">練習・録音</button>
+<button data-screen="analysis">解析</button>
+<button data-screen="history">履歴</button>
+</nav>
+<div class="side-note">PracticeTrack中心<br>Import / Analysis / Recordingを分離</div>
+</aside>
+<main class="main">
+
+<section id="library" class="screen active">
+<div class="topbar"><div><h2>ライブラリ</h2><div class="muted">登録済みPracticeTrackを管理</div></div><button class="btn primary" onclick="switchScreen('import')">＋ 練習曲を追加</button></div>
+<div class="grid cols2">
+<div class="card"><h3>PracticeTrack一覧</h3><div class="track-list">
+<div class="track-item"><div class="thumb">▶</div><div><strong>Sample Song Official Video</strong><span class="muted">曲名: Sample Song / Artist A</span><br><span class="badge">YouTube</span><span class="badge good">Ready</span></div><div class="muted">Em / 118 BPM</div></div>
+<div class="track-item"><div class="thumb">♫</div><div><strong>Practice Track 01</strong><span class="muted">ローカルファイル</span><br><span class="badge gray">Local</span><span class="badge warn">Partial</span></div><div class="muted">A / 132 BPM</div></div>
+<div class="track-item"><div class="thumb">▶</div><div><strong>Live Session 2026</strong><span class="muted">曲名未設定 / Artist未設定</span><br><span class="badge">YouTube</span><span class="badge warn">Processing</span></div><div class="muted">解析中</div></div>
+</div></div>
+<div class="grid">
+<div class="card"><h3>選択中のPracticeTrack</h3><table class="info-table">
+<tr><td>表示名</td><td>Sample Song Official Video</td></tr><tr><td>曲名</td><td>Sample Song</td></tr><tr><td>アーティスト</td><td>Artist A</td></tr><tr><td>Source</td><td>YouTube</td></tr><tr><td>BPM</td><td>118</td></tr><tr><td>Key</td><td>E minor</td></tr><tr><td>Status</td><td><span class="badge good">ready</span></td></tr>
+</table><div style="margin-top:14px;display:flex;gap:10px"><button class="btn primary" onclick="switchScreen('transcribe')">耳コピを開く</button><button class="btn" onclick="switchScreen('practice')">練習する</button></div></div>
+<div class="card"><h3>Processing Jobs</h3><div class="job-list">
+<div class="job"><span>Import</span><div class="progress"><span style="width:100%"></span></div><span class="badge good">成功</span></div>
+<div class="job"><span>Stem分離</span><div class="progress"><span style="width:100%"></span></div><span class="badge good">成功</span></div>
+<div class="job"><span>BPM / Key</span><div class="progress"><span style="width:100%"></span></div><span class="badge good">成功</span></div>
+<div class="job"><span>Chord</span><div class="progress"><span style="width:100%"></span></div><span class="badge good">成功</span></div>
+<div class="job"><span>Pitch Hint</span><div class="progress"><span style="width:100%"></span></div><span class="badge good">成功</span></div>
+</div></div>
+</div></div>
+</section>
+
+<section id="import" class="screen">
+<div class="topbar"><div><h2>練習曲を追加</h2><div class="muted">取込経路のみ分岐し、source_audio生成後は共通処理</div></div></div>
+<div class="grid cols2">
+<div class="card"><h3>取込元</h3>
+<div class="import-choice"><div class="choice active" onclick="selectImport('local',this)"><strong>音声ファイル</strong><div class="muted" style="margin-top:6px">WAV / MP3 / M4A</div></div><div class="choice" onclick="selectImport('youtube',this)"><strong>YouTube URL</strong><div class="muted" style="margin-top:6px">個人利用版のみ</div></div></div>
+<div id="localForm" class="source-box"><div class="form-row"><label>ファイル</label><input value="sample_song.mp3"></div><div class="form-row"><label>表示名</label><input value="Sample Song"></div><div class="form-row"><label>曲名</label><input value="Sample Song"></div><div class="form-row"><label>アーティスト</label><input value="Artist A"></div><button class="btn primary">登録して解析</button></div>
+<div id="youtubeForm" class="source-box" style="display:none"><div class="form-row"><label>YouTube URL</label><input value="https://www.youtube.com/watch?v=xxxxxxxxxxx"></div><button class="btn">情報取得</button>
+<div class="source-box"><div class="kv"><span>動画タイトル</span><span>Sample Song Official Video</span></div><div class="kv"><span>Channel</span><span>Sample Official</span></div><div class="kv"><span>Video ID</span><span>xxxxxxxxxxx</span></div><div class="kv"><span>再生時間</span><span>04:02</span></div></div>
+<div class="form-row"><label>表示名</label><input value="Sample Song Official Video"></div><div class="form-row"><label>曲名</label><input value="Sample Song"></div><div class="form-row"><label>アーティスト</label><input placeholder="任意入力"></div><button class="btn primary">登録して解析</button></div>
+</div>
+<div class="card"><h3>処理フロー</h3><div class="job-list">
+<div class="job"><span>1. Import</span><div class="muted">MediaSource登録</div><span>→</span></div><div class="job"><span>2. source_audio</span><div class="muted">解析用WAV生成</div><span>→</span></div><div class="job"><span>3. Stem</span><div class="muted">Bass等を生成</div><span>→</span></div><div class="job"><span>4. Analysis</span><div class="muted">BPM / Key / Chord / Pitch</div><span>✓</span></div>
+</div><div class="hint" style="margin-top:14px">YouTube / Localの差はImport層まで。以降は共通。</div></div>
+</div>
+</section>
+
+<section id="transcribe" class="screen">
+<div class="topbar"><div><h2>耳コピ支援</h2><div class="muted">Sample Song Official Video</div></div><div class="top-actions"><button class="btn">再解析</button><button class="btn">Chord編集</button></div></div>
+<div class="grid cols2">
+<div class="card"><div class="segment"><button class="active">Source</button><button>Bass Solo</button><button>Bass Mute</button></div>
+<div class="wave-wrap" style="margin-top:14px"><div class="chords"><div class="chord">Em</div><div class="chord">C</div><div class="chord current">G</div><div class="chord">D</div><div class="chord">Em</div><div class="chord">C</div><div class="chord">Am</div><div class="chord">B7</div></div><div class="wave"><div class="ab"></div><div class="playhead"></div></div><div class="pitchline"><div class="pitch">E2 91%</div><div class="pitch">G2 84%</div><div class="pitch">A2 63%</div><div class="pitch">D2 77%</div><div class="pitch">E2 88%</div><div class="pitch">C2 76%</div><div class="pitch">A2 71%</div><div class="pitch">B1 69%</div></div></div>
+<div class="transport" style="margin-top:14px"><button>⏮</button><button>↺</button><button class="play">▶</button><button>↻</button><span class="muted">01:24.2 / 03:42.0</span></div>
+<div class="control-row" style="margin-top:10px"><label>速度 <select><option>50%</option><option>75%</option><option selected>100%</option></select></label><button class="btn">A点</button><button class="btn">B点</button><button class="btn">A-B Loop</button></div></div>
+<div class="grid"><div class="card"><h3>楽曲解析</h3><table class="info-table"><tr><td>Key</td><td>E minor (72)</td></tr><tr><td>BPM</td><td>118</td></tr><tr><td>拍子</td><td>4/4</td></tr><tr><td>現在Chord</td><td>G</td></tr></table></div>
+<div class="card"><h3>Pitch Hint</h3><div class="kv"><span>時刻</span><span>01:24.382</span></div><div class="kv"><span>候補1</span><span>E2 / 0.78</span></div><div class="kv"><span>候補2</span><span>E3 / 0.14</span></div><div class="kv"><span>候補3</span><span>B1 / 0.05</span></div><button class="btn" style="margin-top:8px">候補を修正</button></div><div class="hint">Pitch Hintは採譜ではなく耳コピ補助。怪しい音は複数候補を表示。</div></div>
+</div>
+</section>
+
+<section id="practice" class="screen">
+<div class="topbar"><div><h2>練習・録音</h2><div class="muted">Bass Muteをローカル再生し、演奏後に解析</div></div><button class="btn" onclick="document.getElementById('calibBox').style.display='block'">Latency Calibration</button></div>
+<div id="calibBox" class="card" style="display:none;margin-bottom:16px"><h3>Latency Calibration</h3><div class="grid cols2"><div><div class="form-row"><label>入力</label><select><option>Focusrite USB Input 1</option></select></div><div class="form-row"><label>出力</label><select><option>Focusrite USB Output</option></select></div><div class="form-row"><label>Sample Rate</label><select><option>48000 Hz</option></select></div></div><div class="callout"><strong>測定方法</strong><div class="muted" style="margin-top:6px">Output → Inputをループバックしてクリック音を測定</div><div style="margin-top:12px"><button class="btn primary">自動測定</button></div><div class="kv" style="margin-top:12px"><span>最新結果</span><span><strong>26.8 ms</strong></span></div></div></div></div>
+<div class="grid cols2"><div class="card"><div class="wave-wrap"><div class="chords"><div class="chord">Em</div><div class="chord">C</div><div class="chord current">G</div><div class="chord">D</div><div class="chord">Em</div><div class="chord">C</div><div class="chord">Am</div><div class="chord">B7</div></div><div class="wave"><div class="ab"></div><div class="playhead"></div></div></div>
+<div class="control-row" style="margin-top:14px"><label>伴奏 <select><option selected>Bass Mute</option><option>Source</option></select></label><label>速度 <select><option>75%</option><option>90%</option><option selected>100%</option></select></label><label><input type="checkbox" checked>A-B区間</label></div><div class="callout" style="margin-top:14px"><strong>再生準備</strong><div class="muted" style="margin-top:6px">Bass Muteを演奏PCへロード済み。練習中はネットワーク非依存。</div></div></div>
+<div class="card record-panel"><h3>録音</h3><div class="muted">Input: Focusrite USB / Channel 1</div><div class="level"><span></span></div><div class="record-button">REC</div><div><strong>00:00.0</strong></div><div class="muted" style="margin-top:8px">2小節カウント → Bass Mute再生</div><div class="kv" style="margin-top:16px"><span>Calibration</span><span>26.8 ms</span></div><div class="kv"><span>Monitor</span><span>Direct Monitor推奨</span></div></div></div>
+</section>
+
+<section id="analysis" class="screen">
+<div class="topbar"><div><h2>解析</h2><div class="muted">App内録音セッションを1件選択して解析</div></div></div>
+<div class="grid cols2"><div class="card"><h3>録音セッション</h3><div class="session-card active"><strong>2026/08/28 09:42</strong><div class="muted">Sample Song / 01:20–01:32 / 100%</div></div><div class="session-card"><strong>2026/08/28 09:31</strong><div class="muted">Sample Song / 01:20–01:32 / 90%</div></div><div class="session-card"><strong>2026/08/27 22:14</strong><div class="muted">Sample Song / 00:40–00:52 / 100%</div></div></div>
+<div class="card"><h3>自動取得Context</h3><div class="kv"><span>PracticeTrack</span><span>Sample Song</span></div><div class="kv"><span>Reference</span><span>stem_bass.wav</span></div><div class="kv"><span>区間</span><span>01:20.000 – 01:32.000</span></div><div class="kv"><span>Playback Speed</span><span>100%</span></div><div class="kv"><span>Latency Offset</span><span>26.8 ms</span></div><div class="kv"><span>Sample Rate</span><span>48000 Hz</span></div><details style="margin-top:10px"><summary>詳細設定</summary><div class="source-box"><div class="kv"><span>Onset Detector</span><span>librosa onset / v0.11</span></div><div class="kv"><span>Analysis Version</span><span>0.4</span></div></div></details><button class="btn primary" style="margin-top:14px">解析開始</button></div></div>
+<div class="grid cols3" style="margin-top:16px"><div class="card stat warn"><div class="muted">平均タイミング</div><div class="value">+12 ms</div><div class="muted">やや遅れ傾向</div></div><div class="card stat good"><div class="muted">平均絶対誤差</div><div class="value">24 ms</div><div class="muted">Matched 121 / 128</div></div><div class="card stat"><div class="muted">音量ばらつき</div><div class="value">2.1 dB</div><div class="muted">標準偏差</div></div></div>
+<div class="grid cols2" style="margin-top:16px"><div class="card"><h3>発音タイミング</h3><div class="chart"><div class="zero"></div><span class="dot" style="left:8%;top:42%"></span><span class="dot" style="left:16%;top:54%"></span><span class="dot" style="left:25%;top:37%"></span><span class="dot" style="left:34%;top:61%"></span><span class="dot" style="left:43%;top:47%"></span><span class="dot" style="left:53%;top:57%"></span><span class="dot" style="left:62%;top:32%"></span><span class="dot" style="left:71%;top:52%"></span><span class="dot" style="left:81%;top:44%"></span><span class="dot" style="left:91%;top:66%"></span></div><div class="muted" style="margin-top:8px">0msより下：遅れ / 上：走り</div></div>
+<div class="card"><h3>Note Event</h3><table class="history-table"><thead><tr><th>#</th><th>Ref</th><th>User</th><th>Timing</th><th>Level</th><th>Status</th></tr></thead><tbody><tr><td>31</td><td>01:24.000</td><td>01:24.018</td><td>+18 ms</td><td>-14.2 dB</td><td>Matched</td></tr><tr><td>32</td><td>01:24.500</td><td>01:24.491</td><td>-9 ms</td><td>-13.8 dB</td><td>Matched</td></tr><tr><td>33</td><td>01:25.000</td><td>01:25.032</td><td>+32 ms</td><td>-18.1 dB</td><td>Matched</td></tr><tr><td>34</td><td>01:25.500</td><td>-</td><td>-</td><td>-</td><td>Missing</td></tr></tbody></table></div></div>
+</section>
+
+<section id="history" class="screen">
+<div class="topbar"><div><h2>履歴</h2><div class="muted">RecordingSession / AnalysisResultの比較</div></div></div>
+<div class="card"><table class="history-table"><thead><tr><th>Date</th><th>PracticeTrack</th><th>Section</th><th>Speed</th><th>MAE</th><th>Timing SD</th><th>Volume SD</th><th>Missing</th></tr></thead><tbody><tr><td>2026-08-28</td><td>Sample Song</td><td>01:20–01:32</td><td>100%</td><td>24 ms</td><td>17 ms</td><td>2.1 dB</td><td>7</td></tr><tr><td>2026-08-28</td><td>Sample Song</td><td>01:20–01:32</td><td>90%</td><td>31 ms</td><td>22 ms</td><td>2.6 dB</td><td>10</td></tr><tr><td>2026-08-27</td><td>Sample Song</td><td>01:20–01:32</td><td>75%</td><td>42 ms</td><td>29 ms</td><td>3.3 dB</td><td>15</td></tr></tbody></table></div>
+</section>
+
+</main></div>
+<script>
+const navButtons=document.querySelectorAll('.nav button'),screens=document.querySelectorAll('.screen');
+function switchScreen(id){screens.forEach(s=>s.classList.toggle('active',s.id===id));navButtons.forEach(b=>b.classList.toggle('active',b.dataset.screen===id))}
+navButtons.forEach(btn=>btn.addEventListener('click',()=>switchScreen(btn.dataset.screen)));
+function selectImport(type,el){document.querySelectorAll('.choice').forEach(c=>c.classList.remove('active'));el.classList.add('active');document.getElementById('localForm').style.display=type==='local'?'block':'none';document.getElementById('youtubeForm').style.display=type==='youtube'?'block':'none'}
+</script>
+</body></html>
