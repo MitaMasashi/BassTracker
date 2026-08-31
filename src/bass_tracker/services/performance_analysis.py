@@ -48,9 +48,26 @@ class AnalysisService:
         if not recording: raise AppError("RECORDING_SESSION_NOT_FOUND", "RecordingSession was not found.", 404)
         reference = self.session.scalar(select(AudioAsset).where(AudioAsset.practice_track_id == recording.practice_track_id, AudioAsset.asset_type == "stem_bass").order_by(AudioAsset.created_at.desc()))
         if not reference: raise AppError("REFERENCE_ASSET_NOT_FOUND", "Reference bass asset was not found.", 409)
+        track = self.session.get(PracticeTrack, recording.practice_track_id)
         calibration = self.session.get(LatencyCalibration, recording.latency_calibration_id) if recording.latency_calibration_id else None
+        bpm = track.bpm or 120.0
+        beats_per_bar = track.time_signature_numerator or 4
+        time_signature_denominator = track.time_signature_denominator or 4
+        count_in_seconds = count_in_duration(bpm, recording.playback_speed, recording.count_in_bars, beats_per_bar)
+        parameters = {
+            "matching_tolerance_ms": 80,
+            "level_window_ms": 120,
+            "onset_hop_length": 128,
+            "bpm": bpm,
+            "time_signature_numerator": beats_per_bar,
+            "time_signature_denominator": time_signature_denominator,
+            "count_in_bars": recording.count_in_bars,
+            "count_in_duration_seconds": count_in_seconds,
+            "recording_sample_rate_hz": recording.sample_rate_hz,
+            "reference_sample_rate_hz": reference.sample_rate_hz,
+        }
         job = ProcessingJob(practice_track_id=recording.practice_track_id, job_type="performance_analysis", status="queued", parameters_json="{}"); self.session.add(job); self.session.flush()
-        context = AnalysisContext(recording_session_id=recording.id, reference_audio_asset_id=reference.id, reference_start_seconds=recording.section_start_seconds, reference_end_seconds=recording.section_end_seconds, playback_speed=recording.playback_speed, latency_offset_ms=calibration.roundtrip_latency_ms if calibration else 0, onset_detector="librosa_onset", onset_detector_version="0.11", analysis_version="1", parameters_json=json.dumps({"matching_tolerance_ms": 80, "level_window_ms": 120, "onset_hop_length": 128}), processing_job_id=job.id)
+        context = AnalysisContext(recording_session_id=recording.id, reference_audio_asset_id=reference.id, reference_start_seconds=recording.section_start_seconds, reference_end_seconds=recording.section_end_seconds, playback_speed=recording.playback_speed, latency_offset_ms=calibration.roundtrip_latency_ms if calibration else 0, onset_detector="librosa_onset", onset_detector_version="0.11", analysis_version="1", parameters_json=json.dumps(parameters), processing_job_id=job.id)
         self.session.add(context); self.session.flush(); job.parameters_json = json.dumps({"analysis_context_id": context.id}); self.session.commit(); return context, job
     def histories(self, recording_id: int):
         contexts = list(self.session.scalars(select(AnalysisContext).where(AnalysisContext.recording_session_id == recording_id).order_by(AnalysisContext.created_at.desc())))
@@ -88,7 +105,11 @@ class PerformanceAnalysisProcessor:
         # ReferenceもSection区間だけを検出対象にし、User側と同条件のDetectorへ通す (仕様13.9)
         ref_slice = ref_y[int(max(0.0, context.reference_start_seconds) * ref_sr):int(max(0.0, context.reference_end_seconds) * ref_sr)]
         ref_samples = librosa.onset.onset_detect(y=ref_slice, sr=ref_sr, units="samples", hop_length=hop, backtrack=True); user_samples = librosa.onset.onset_detect(y=user_y, sr=user_sr, units="samples", hop_length=hop, backtrack=True)
-        bpm, beats = track.bpm or 120, track.time_signature_numerator or 4; count_in = count_in_duration(bpm, recording.playback_speed, recording.count_in_bars, beats)
+        # New contexts carry every timing input as a snapshot.  The fallback is
+        # retained only so jobs created before this version remain executable.
+        bpm = float(parameters.get("bpm", track.bpm or 120.0))
+        beats = int(parameters.get("time_signature_numerator", track.time_signature_numerator or 4))
+        count_in = float(parameters.get("count_in_duration_seconds", count_in_duration(bpm, recording.playback_speed, recording.count_in_bars, beats)))
         reference = [reference_recording_time(context.reference_start_seconds + float(sample / ref_sr), context.reference_start_seconds, context.playback_speed, count_in) for sample in ref_samples]
         user = [float(sample / user_sr) for sample in user_samples]; matches = match_events(reference, user, context.latency_offset_ms, parameters["matching_tolerance_ms"]); errors = [match.timing_error_ms for match in matches if match.timing_error_ms is not None]; levels = [event_level(user_y, user_sr, match.user_time, parameters["level_window_ms"]) for match in matches if match.user_time is not None and match.status != "missing"]
         result = AnalysisResult(analysis_context_id=context.id, reference_note_count=len(reference), matched_note_count=sum(m.status == "matched" for m in matches), missing_note_count=sum(m.status == "missing" for m in matches), extra_note_count=sum(m.status == "extra" for m in matches), timing_mean_ms=float(np.mean(errors)) if errors else None, timing_mae_ms=float(np.mean(np.abs(errors))) if errors else None, timing_std_ms=float(np.std(errors)) if errors else None, level_mean_db=float(np.mean(levels)) if levels else None, level_std_db=float(np.std(levels)) if levels else None, level_min_db=float(np.min(levels)) if levels else None, level_max_db=float(np.max(levels)) if levels else None, analysis_status="succeeded"); self.session.add(result); self.session.flush()
@@ -110,6 +131,17 @@ class HistoryService:
         if to_time: query = query.where(RecordingSession.recorded_at <= to_time)
         items = []
         for recording in self.session.scalars(query):
-            track = self.session.get(PracticeTrack, recording.practice_track_id); context = self.session.scalar(select(AnalysisContext).where(AnalysisContext.recording_session_id == recording.id).order_by(AnalysisContext.created_at.desc())); result = self.session.scalar(select(AnalysisResult).where(AnalysisResult.analysis_context_id == context.id)) if context else None
-            items.append({"recording_session_id": recording.id, "recorded_at": recording.recorded_at, "practice_track_id": track.id, "practice_track": track.display_title, "section_start_seconds": recording.section_start_seconds, "section_end_seconds": recording.section_end_seconds, "playback_speed": recording.playback_speed, "result_id": result.id if result else None, "timing_mean_ms": result.timing_mean_ms if result else None, "timing_mae_ms": result.timing_mae_ms if result else None, "timing_std_ms": result.timing_std_ms if result else None, "level_std_db": result.level_std_db if result else None, "missing_note_count": result.missing_note_count if result else None, "extra_note_count": result.extra_note_count if result else None})
+            track = self.session.get(PracticeTrack, recording.practice_track_id)
+            successful = self.session.execute(
+                select(AnalysisContext, AnalysisResult)
+                .join(AnalysisResult, AnalysisResult.analysis_context_id == AnalysisContext.id)
+                .where(
+                    AnalysisContext.recording_session_id == recording.id,
+                    AnalysisResult.analysis_status == "succeeded",
+                )
+                .order_by(AnalysisContext.created_at.desc(), AnalysisResult.analyzed_at.desc())
+                .limit(1)
+            ).first()
+            result = successful[1] if successful else None
+            items.append({"recording_session_id": recording.id, "recorded_at": recording.recorded_at, "practice_track_id": track.id, "practice_track": track.display_title, "section_start_seconds": recording.section_start_seconds, "section_end_seconds": recording.section_end_seconds, "playback_speed": recording.playback_speed, "result_id": result.id if result else None, "timing_mean_ms": result.timing_mean_ms if result else None, "timing_mae_ms": result.timing_mae_ms if result else None, "timing_std_ms": result.timing_std_ms if result else None, "level_std_db": result.level_std_db if result else None, "matched_note_count": result.matched_note_count if result else None, "missing_note_count": result.missing_note_count if result else None, "extra_note_count": result.extra_note_count if result else None})
         return items

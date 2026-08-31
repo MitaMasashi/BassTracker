@@ -221,5 +221,6 @@ class HistoryItem(BaseModel):
     timing_mae_ms: float | None
     timing_std_ms: float | None
     level_std_db: float | None
+    matched_note_count: int | None
     missing_note_count: int | None
     extra_note_count: int | None

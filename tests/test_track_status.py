@@ -61,6 +61,28 @@ def test_partial_when_pitch_analysis_failed(tmp_path: Path) -> None:
     assert refresh_track_status(session, track_id) == "partial"
 
 
+def test_successful_retry_supersedes_failed_job_history(tmp_path: Path) -> None:
+    session = make_session(tmp_path)
+    track_id = add_track(session, bpm=120.0, musical_key="E minor")
+    for asset_type in ("source_audio", "stem_bass", "bass_mute"):
+        add_asset(session, track_id, asset_type)
+    for job_type in ("import", "stem_separation", "bpm_analysis", "key_analysis", "chord_analysis"):
+        add_job(session, track_id, job_type, "succeeded")
+    add_job(session, track_id, "pitch_analysis", "failed")
+    add_job(session, track_id, "pitch_analysis", "succeeded")
+
+    assert refresh_track_status(session, track_id) == "ready"
+
+
+def test_queued_retry_supersedes_failed_import_state(tmp_path: Path) -> None:
+    session = make_session(tmp_path)
+    track_id = add_track(session)
+    add_job(session, track_id, "import", "failed")
+    add_job(session, track_id, "import", "queued")
+
+    assert refresh_track_status(session, track_id) == "processing"
+
+
 def test_ready_requires_assets_metadata_and_analysis_jobs(tmp_path: Path) -> None:
     session = make_session(tmp_path)
     track_id = add_track(session, bpm=118.0, musical_key="E minor")

@@ -71,7 +71,7 @@ export function PracticePage() {
 
   useEffect(() => {
     if (!deviceId) return;
-    api.calibrations({ input_device_id: deviceId, sample_rate_hz: sampleRate })
+    api.calibrations({ input_device_id: deviceId, output_device_id: "default", sample_rate_hz: sampleRate })
       .then((items) => { setCalibrations(items); setCalibrationId(items[0]?.id ?? null); })
       .catch(() => setCalibrations([]));
   }, [deviceId, sampleRate]);
@@ -101,7 +101,7 @@ export function PracticePage() {
     }
     const { blob, sampleRate: rate } = await engine.current.stop();
     setRecording(false);
-    const payload: PendingUpload = { blob, metadata: { practice_track_id: trackId, section_start_seconds: section.start, section_end_seconds: section.end, playback_speed: speed, count_in_bars: countInBars, sample_rate_hz: rate, audio_input_device_id: deviceId, audio_output_device_id: null, latency_calibration_id: calibrationId } };
+    const payload: PendingUpload = { blob, metadata: { practice_track_id: trackId, section_start_seconds: section.start, section_end_seconds: section.end, playback_speed: speed, count_in_bars: countInBars, sample_rate_hz: rate, audio_input_device_id: deviceId, audio_output_device_id: "default", latency_calibration_id: calibrationId } };
     try {
       await upload(payload);
       setPending(null);

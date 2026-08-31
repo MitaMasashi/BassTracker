@@ -17,7 +17,7 @@ export interface ApiTrack { id: number; display_title: string; song_title: strin
 export interface ApiJob { id: number; practice_track_id: number; job_type: string; status: string; error_message: string | null }
 export interface ApiAsset { id: number; practice_track_id: number; asset_type: string; file_path: string; format: string; sample_rate_hz: number | null; channels: number | null; duration_seconds: number | null }
 export interface ApiRecording { id: number; practice_track_id: number; recording_audio_asset_id: number; section_start_seconds: number; section_end_seconds: number; playback_speed: number; count_in_bars: number; sample_rate_hz: number; audio_input_device_id: string | null; audio_output_device_id: string | null; latency_calibration_id: number | null; recorded_at: string }
-export interface ApiHistory { recording_session_id: number; recorded_at: string; practice_track_id: number; practice_track: string; section_start_seconds: number; section_end_seconds: number; playback_speed: number; result_id: number | null; timing_mean_ms: number | null; timing_mae_ms: number | null; timing_std_ms: number | null; level_std_db: number | null; missing_note_count: number | null; extra_note_count: number | null }
+export interface ApiHistory { recording_session_id: number; recorded_at: string; practice_track_id: number; practice_track: string; section_start_seconds: number; section_end_seconds: number; playback_speed: number; result_id: number | null; timing_mean_ms: number | null; timing_mae_ms: number | null; timing_std_ms: number | null; level_std_db: number | null; matched_note_count: number | null; missing_note_count: number | null; extra_note_count: number | null }
 export interface ApiChord { id: number; start_seconds: number; end_seconds: number; detected_chord: string; selected_chord: string; confidence: number | null; is_user_corrected: boolean }
 export interface ApiPitchCandidate { rank: number; pitch: string; midi_note: number; frequency_hz: number; score: number }
 export interface ApiPitch { id: number; onset_seconds: number; end_seconds: number | null; selected_pitch: string | null; selected_midi_note: number | null; is_user_corrected: boolean; candidates: ApiPitchCandidate[] }
@@ -49,7 +49,7 @@ export const api = {
   pitches: (trackId: number) => request<ApiPitch[]>(`/practice-tracks/${trackId}/pitch-events`),
   patchPitch: (eventId: number, body: { selected_pitch: string; selected_midi_note: number }) => request<unknown>(`/pitch-events/${eventId}`, jsonInit("PATCH", body)),
   assetContent: (assetId: number) => `${API_BASE}/audio-assets/${assetId}/content`,
-  calibrations: (filters: { input_device_id?: string; sample_rate_hz?: number } = {}) => request<ApiCalibration[]>(`/latency-calibrations${query(filters)}`),
+  calibrations: (filters: { input_device_id?: string; output_device_id?: string; sample_rate_hz?: number } = {}) => request<ApiCalibration[]>(`/latency-calibrations${query(filters)}`),
   createCalibration: (body: object) => request<ApiCalibration>("/latency-calibrations", jsonInit("POST", body)),
   recordings: (trackId?: number) => request<ApiRecording[]>(`/recording-sessions${query({ practice_track_id: trackId })}`),
   uploadRecording: (form: FormData) => request<ApiRecording>("/recording-sessions", { method: "POST", body: form }),
@@ -57,5 +57,5 @@ export const api = {
   analyses: (sessionId: number) => request<ApiAnalysisContext[]>(`/recording-sessions/${sessionId}/analyses`),
   analysisResult: (resultId: number) => request<ApiAnalysisResult>(`/analysis-results/${resultId}`),
   noteEvents: (resultId: number) => request<ApiNoteEvent[]>(`/analysis-results/${resultId}/note-events`),
-  history: (trackId?: number) => request<ApiHistory[]>(`/history${query({ practice_track_id: trackId })}`),
+  history: (filters: { practice_track_id?: number; section_start_seconds?: number; section_end_seconds?: number; from?: string; to?: string } = {}) => request<ApiHistory[]>(`/history${query(filters)}`),
 };

@@ -1,10 +1,10 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from bass_tracker.db.models import Base, PracticeTrack, ProcessingJob
+from bass_tracker.db.models import AudioAsset, Base, PracticeTrack, ProcessingJob
 from bass_tracker.db.session import create_database_engine, get_session
 from bass_tracker.jobs import ProcessorRegistry, Worker
 from bass_tracker.main import app
@@ -67,4 +67,38 @@ def test_unknown_processor_fails_job_without_stopping_worker(tmp_path: Path) -> 
     assert job.status == "failed"
     assert job.error_code == "PROCESSOR_NOT_FOUND"
     assert worker.run_once() is False
+    session.close()
+
+
+def test_processor_failure_rolls_back_partial_database_writes(tmp_path: Path) -> None:
+    session, _ = make_session(tmp_path)
+    track = PracticeTrack(display_title="Track", status="processing")
+    session.add(track)
+    session.flush()
+    job = ProcessingJob(practice_track_id=track.id, job_type="failing", status="queued")
+    session.add(job)
+    session.commit()
+
+    class FailingProcessor:
+        job_type = "failing"
+
+        def run(self, _: int) -> None:
+            session.add(
+                AudioAsset(
+                    practice_track_id=track.id,
+                    asset_type="partial_output",
+                    file_path="partial-output.wav",
+                    format="wav",
+                )
+            )
+            raise RuntimeError("processor failed after writing output")
+
+    registry = ProcessorRegistry()
+    registry.register(FailingProcessor())
+
+    assert Worker(session, registry).run_once() is True
+    session.refresh(job)
+    assert job.status == "failed"
+    assert job.error_code == "PROCESSOR_FAILED"
+    assert list(session.scalars(select(AudioAsset))) == []
     session.close()

@@ -108,10 +108,24 @@ describe("LibraryPage", () => {
 describe("HistoryPage", () => {
   it("renders one row per recording session", async () => {
     mocked.history.mockResolvedValue([
-      { recording_session_id: 1, recorded_at: "2026-08-30T10:00:00Z", practice_track_id: 7, practice_track: "Sample Song", section_start_seconds: 80, section_end_seconds: 92, playback_speed: 0.9, result_id: 3, timing_mean_ms: 5, timing_mae_ms: 24.1, timing_std_ms: 17.2, level_std_db: 2.1, missing_note_count: 7, extra_note_count: 4 },
-      { recording_session_id: 2, recorded_at: "2026-08-31T10:00:00Z", practice_track_id: 7, practice_track: "Sample Song", section_start_seconds: 80, section_end_seconds: 92, playback_speed: 1, result_id: null, timing_mean_ms: null, timing_mae_ms: null, timing_std_ms: null, level_std_db: null, missing_note_count: null, extra_note_count: null },
+      { recording_session_id: 2, recorded_at: "2026-08-31T10:00:00Z", practice_track_id: 7, practice_track: "Sample Song", section_start_seconds: 80, section_end_seconds: 92, playback_speed: 1, result_id: null, timing_mean_ms: null, timing_mae_ms: null, timing_std_ms: null, level_std_db: null, matched_note_count: null, missing_note_count: null, extra_note_count: null },
+      { recording_session_id: 1, recorded_at: "2026-08-30T10:00:00Z", practice_track_id: 7, practice_track: "Sample Song", section_start_seconds: 80, section_end_seconds: 92, playback_speed: 0.9, result_id: 3, timing_mean_ms: 5, timing_mae_ms: 24.1, timing_std_ms: 17.2, level_std_db: 2.1, matched_note_count: 121, missing_note_count: 7, extra_note_count: 4 },
     ]);
     renderWithLayout("/history");
     await waitFor(() => expect(screen.getAllByRole("row")).toHaveLength(3));
+    expect(screen.getAllByRole("link", { name: "詳細" }).some((link) => link.getAttribute("href") === "/analysis?session_id=1&result_id=3")).toBe(true);
+    const firstMetricBars = document.querySelectorAll(".trend-row:first-child .trend-bars > span");
+    expect(firstMetricBars[0]).toHaveAttribute("title", expect.stringContaining("90%"));
+  });
+
+  it("sends selected track and section filters to the history API", async () => {
+    mocked.history.mockResolvedValue([
+      { recording_session_id: 1, recorded_at: "2026-08-30T10:00:00Z", practice_track_id: 7, practice_track: "Sample Song", section_start_seconds: 80, section_end_seconds: 92, playback_speed: 0.9, result_id: 3, timing_mean_ms: 5, timing_mae_ms: 24.1, timing_std_ms: 17.2, level_std_db: 2.1, matched_note_count: 121, missing_note_count: 7, extra_note_count: 4 },
+    ]);
+    renderWithLayout("/history");
+    await screen.findByRole("option", { name: "Sample Song" });
+    await userEvent.selectOptions(screen.getByLabelText("PracticeTrack"), "7");
+    await userEvent.type(screen.getByLabelText("Section A"), "80");
+    await waitFor(() => expect(mocked.history).toHaveBeenLastCalledWith(expect.objectContaining({ practice_track_id: 7, section_start_seconds: 80 })));
   });
 });

@@ -40,6 +40,18 @@ export function AnalysisPage() {
     setNotes([]);
     setJobId(null);
     api.analyses(sessionId).then((items) => {
+      const requestedSessionId = Number(params.get("session_id"));
+      const requestedResultId = sessionId === requestedSessionId ? Number(params.get("result_id")) : 0;
+      if (requestedResultId > 0) {
+        const requested = items.find((item) => item.analysis_result_id === requestedResultId);
+        setContext(requested ?? items[0] ?? null);
+        if (requested) {
+          void loadResult(requestedResultId).catch(() => setMessage("指定された解析結果を取得できませんでした"));
+        } else {
+          setMessage("指定された解析結果はこの録音セッションに存在しません");
+        }
+        return;
+      }
       const latest = items.find((item) => item.analysis_result_id);
       setContext(latest ?? items[0] ?? null);
       if (latest?.analysis_result_id) void loadResult(latest.analysis_result_id);

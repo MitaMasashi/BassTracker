@@ -13,12 +13,23 @@ def refresh_track_status(session: Session, track_id: int) -> str | None:
     track = session.get(PracticeTrack, track_id)
     if not track: return None
     assets = set(session.scalars(select(AudioAsset.asset_type).where(AudioAsset.practice_track_id == track_id)))
-    jobs = [(job_type, status) for job_type, status in session.execute(select(ProcessingJob.job_type, ProcessingJob.status).where(ProcessingJob.practice_track_id == track_id)).all() if job_type in TRACK_JOB_TYPES]
-    pending = any(status in ("queued", "running") for _, status in jobs)
-    failed = any(status == "failed" for _, status in jobs)
-    succeeded = {job_type for job_type, status in jobs if status == "succeeded"}
+    job_history = session.execute(
+        select(ProcessingJob.job_type, ProcessingJob.status)
+        .where(
+            ProcessingJob.practice_track_id == track_id,
+            ProcessingJob.job_type.in_(TRACK_JOB_TYPES),
+        )
+        .order_by(ProcessingJob.created_at, ProcessingJob.id)
+    ).all()
+    # Retry creates a new job and deliberately leaves the failed source job in
+    # history.  Availability must therefore follow the newest attempt of each
+    # job type, not every historical failure.
+    latest_status = {job_type: status for job_type, status in job_history}
+    pending = any(status in ("queued", "running") for status in latest_status.values())
+    failed = any(status == "failed" for status in latest_status.values())
+    succeeded = {job_type for job_type, status in latest_status.items() if status == "succeeded"}
     if "source_audio" not in assets:
-        if any(job_type == "import" and status == "failed" for job_type, status in jobs): track.status = "error"
+        if latest_status.get("import") == "failed": track.status = "error"
         else: track.status = "processing" if pending else "registered"
     elif pending: track.status = "processing"
     elif not failed and all(asset in assets for asset in READY_ASSET_TYPES) and track.bpm and track.musical_key and all(job_type in succeeded for job_type in READY_JOB_TYPES): track.status = "ready"

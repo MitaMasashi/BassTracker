@@ -20,7 +20,7 @@ BEATS_PER_BAR = 4
 TOLERANCE_MS = 10
 
 
-def run_analysis(tmp_path: Path, user_onsets: list[float], *, playback_speed: float = 1.0, count_in_bars: int = 0, latency_ms: float = 0.0, user_amplitudes: list[float] | None = None) -> tuple[AnalysisResult, list[NoteEvent]]:
+def run_analysis(tmp_path: Path, user_onsets: list[float], *, playback_speed: float = 1.0, count_in_bars: int = 0, latency_ms: float = 0.0, user_amplitudes: list[float] | None = None, bpm_after_start: float | None = None) -> tuple[AnalysisResult, list[NoteEvent]]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     engine = create_database_engine(f"sqlite:///{tmp_path / 'analysis.db'}")
     Base.metadata.create_all(engine)
@@ -50,6 +50,9 @@ def run_analysis(tmp_path: Path, user_onsets: list[float], *, playback_speed: fl
     session.commit()
 
     _, job = AnalysisService(session).start(recording.id)
+    if bpm_after_start is not None:
+        track.bpm = bpm_after_start
+        session.commit()
     PerformanceAnalysisProcessor(session, storage).run(job.id)
     session.commit()
 
@@ -110,6 +113,12 @@ def test_count_in_offset_is_applied(tmp_path: Path) -> None:
     times = recording_times(count_in_bars=2)
     assert times[0] == pytest.approx(count_in_duration(BPM, 1.0, 2, BEATS_PER_BAR) + 0.1)
     result, _ = run_analysis(tmp_path, times, count_in_bars=2)
+    assert result.matched_note_count == len(REFERENCE_ONSETS)
+
+
+def test_analysis_uses_track_snapshot_taken_when_job_starts(tmp_path: Path) -> None:
+    times = recording_times(count_in_bars=1)
+    result, _ = run_analysis(tmp_path, times, count_in_bars=1, bpm_after_start=60)
     assert result.matched_note_count == len(REFERENCE_ONSETS)
 
 
