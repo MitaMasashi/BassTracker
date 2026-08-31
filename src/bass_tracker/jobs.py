@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from bass_tracker.repositories import ProcessingJobRepository
 from bass_tracker.services.commands import CommandError
+from bass_tracker.services.status import refresh_track_status
 
 
 class JobProcessor(Protocol):
@@ -31,4 +32,6 @@ class Worker:
             try: processor.run(job.id); job.status = "succeeded"
             except CommandError as exc: job.status, job.error_code, job.error_message = "failed", exc.code, str(exc)
             except Exception as exc: job.status, job.error_code, job.error_message = "failed", "PROCESSOR_FAILED", str(exc)
-        job.finished_at = datetime.now(timezone.utc); self.session.commit(); return True
+        job.finished_at = datetime.now(timezone.utc); self.session.commit()
+        refresh_track_status(self.session, job.practice_track_id)
+        return True

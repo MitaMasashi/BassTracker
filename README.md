@@ -18,6 +18,7 @@ Frontendの検証:
 
 ```powershell
 cd frontend
+npm test
 npm run build
 ```
 

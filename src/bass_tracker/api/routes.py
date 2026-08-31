@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from bass_tracker.db.session import get_session
 from bass_tracker.config import get_settings
 from bass_tracker.errors import AppError
-from bass_tracker.schemas import AnalysisAccepted, AnalysisResultResponse, AudioAssetResponse, CalibrationCreate, CalibrationResponse, ChordEventResponse, ChordPatch, HistoryItem, ImportAccepted, JobResponse, MusicalAnalysisResponse, NoteEventResponse, PitchEventResponse, PitchPatch, RecordingMetadata, RecordingSessionResponse, TrackListResponse, TrackPatch, TrackResponse, YouTubeImportRequest, YouTubeMetadataRequest
+from bass_tracker.schemas import AnalysisAccepted, AnalysisContextResponse, AnalysisResultResponse, AudioAssetResponse, CalibrationCreate, CalibrationResponse, ChordEventResponse, ChordPatch, HistoryItem, ImportAccepted, JobResponse, MusicalAnalysisResponse, NoteEventResponse, PitchEventResponse, PitchPatch, RecordingMetadata, RecordingSessionResponse, TrackListResponse, TrackPatch, TrackResponse, YouTubeImportRequest, YouTubeMetadataRequest
 from bass_tracker.services.core import JobService, TrackService
 from bass_tracker.services.imports import ImportApplicationService, default_import_dependencies, list_assets
 from bass_tracker.services.musical_analysis import MusicalAnalysisService
@@ -149,7 +149,7 @@ def start_analysis(session_id: int, session: DbSession):
     context, job = AnalysisService(session).start(session_id); return AnalysisAccepted(analysis_context_id=context.id, processing_job_id=job.id)
 
 
-@router.get("/recording-sessions/{session_id}/analyses", tags=["analysis"])
+@router.get("/recording-sessions/{session_id}/analyses", response_model=list[AnalysisContextResponse], tags=["analysis"])
 def analyses(session_id: int, session: DbSession): return AnalysisService(session).histories(session_id)
 
 

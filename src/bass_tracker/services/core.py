@@ -4,6 +4,7 @@ from bass_tracker.db.models import ProcessingJob
 from bass_tracker.errors import AppError
 from bass_tracker.repositories import PracticeTrackRepository, ProcessingJobRepository
 from bass_tracker.schemas import TrackPatch
+from bass_tracker.services.status import refresh_track_status
 
 
 class TrackService:
@@ -16,7 +17,7 @@ class TrackService:
     def update(self, track_id: int, patch: TrackPatch):
         track = self.get(track_id)
         for key, value in patch.model_dump(exclude_unset=True).items(): setattr(track, key, value)
-        self.session.commit(); self.session.refresh(track); return track
+        self.session.commit(); refresh_track_status(self.session, track_id); self.session.refresh(track); return track
 
 
 class JobService:

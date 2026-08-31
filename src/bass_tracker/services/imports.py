@@ -58,9 +58,8 @@ class ImportJobProcessor:
             self.session.add(asset); self.session.flush(); self.session.add(ProcessingJobOutput(processing_job_id=job.id, audio_asset_id=asset.id, role="source_audio"))
             for job_type in ("stem_separation", "bpm_analysis", "key_analysis", "chord_analysis"):
                 self.session.add(ProcessingJob(practice_track_id=job.practice_track_id, job_type=job_type, status="queued", parameters_json=json.dumps({"source_asset_id": asset.id})))
-            self.session.get(PracticeTrack, job.practice_track_id).status = "partial"
-        except CommandError as exc:
-            self.session.get(PracticeTrack, job.practice_track_id).status = "error"
+        except CommandError:
+            self.session.rollback()
             raise
 
 

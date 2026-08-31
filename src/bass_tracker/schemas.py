@@ -162,6 +162,22 @@ class AnalysisAccepted(BaseModel):
     processing_job_id: int
 
 
+class AnalysisContextResponse(BaseModel):
+    id: int
+    recording_session_id: int
+    reference_audio_asset_id: int
+    reference_start_seconds: float
+    reference_end_seconds: float
+    playback_speed: float
+    latency_offset_ms: float
+    onset_detector: str
+    analysis_version: str
+    processing_job_id: int
+    job_status: str | None
+    analysis_result_id: int | None
+    created_at: datetime
+
+
 class AnalysisResultResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int

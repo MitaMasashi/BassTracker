@@ -3,18 +3,20 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/common/PageHeader";
 import { ViewStatePanel } from "../components/common/ViewStatePanel";
-import { useViewState } from "../components/layout/AppLayout";
+import { useSelectedTrack, useViewState } from "../components/layout/AppLayout";
 import { api, type ApiJob, type ApiTrack } from "../api/client";
 
 const statusLabels = { registered: "登録済み", processing: "処理中", ready: "Ready", partial: "一部利用可", error: "エラー" };
 
 export function LibraryPage() {
   const forcedState = useViewState();
+  const { selectTrack } = useSelectedTrack();
   const [tracks, setTracks] = useState<ApiTrack[]>([]);
   const [jobs, setJobs] = useState<ApiJob[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [requestState, setRequestState] = useState<"normal" | "loading" | "empty" | "error">("loading");
   useEffect(() => { api.tracks().then(({ items }) => { setTracks(items); setSelectedId(items[0]?.id ?? null); setRequestState(items.length ? "normal" : "empty"); }).catch(() => setRequestState("error")); }, []);
+  useEffect(() => { if (selectedId) selectTrack(selectedId); }, [selectedId, selectTrack]);
   useEffect(() => { if (!selectedId) return; const load = () => api.jobs(selectedId).then(setJobs).catch(() => setJobs([])); load(); const timer = window.setInterval(load, 2000); return () => window.clearInterval(timer); }, [selectedId]);
   const state = forcedState === "normal" ? requestState : forcedState;
   const selected = tracks.find((track) => track.id === selectedId);

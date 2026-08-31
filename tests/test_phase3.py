@@ -57,7 +57,7 @@ def test_local_import_creates_traced_source_audio(tmp_path: Path) -> None:
     assert storage.resolve(asset.file_path).is_file()
     assert session.get(ProcessingJob, job_id).status == "succeeded"
     assert session.scalar(select(ProcessingJobOutput).where(ProcessingJobOutput.processing_job_id == job_id))
-    assert session.get(PracticeTrack, track_id).status == "partial"
+    assert session.get(PracticeTrack, track_id).status == "processing"
 
 
 def test_youtube_import_keeps_creator_separate_from_artist(tmp_path: Path) -> None:
