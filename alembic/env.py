@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
@@ -7,7 +8,10 @@ from bass_tracker.config import get_settings
 from bass_tracker.db.models import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+database_url = get_settings().database_url
+if database_url.startswith("sqlite:///") and ":memory:" not in database_url:
+    Path(database_url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
+config.set_main_option("sqlalchemy.url", database_url)
 if config.config_file_name:
     fileConfig(config.config_file_name)
 target_metadata = Base.metadata

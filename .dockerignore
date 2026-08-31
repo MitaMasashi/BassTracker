@@ -1,0 +1,11 @@
+.git
+.venv
+.pytest_cache
+.pytest-run-*
+__pycache__
+*.py[cod]
+data
+frontend/node_modules
+frontend/dist
+tests
+bass_practice_app_ui_mock_v04.html

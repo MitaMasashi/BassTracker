@@ -2,10 +2,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from bass_tracker.api.routes import router as api_router
+from bass_tracker.config import get_settings
 from bass_tracker.db.session import create_tables
 from bass_tracker.errors import register_error_handlers
 
@@ -19,6 +21,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Bass Practice Lab", version="0.1.0", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=[origin.strip() for origin in get_settings().cors_origins.split(",")], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(api_router, prefix="/api")
 register_error_handlers(app)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

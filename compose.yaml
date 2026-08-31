@@ -1,0 +1,76 @@
+x-backend-environment: &backend-environment
+  DATABASE_URL: sqlite:////data/app.db
+  DATA_ROOT: /data/storage
+  TEMP_ROOT: /data/tmp
+  FFMPEG_PATH: ffmpeg
+  FFPROBE_PATH: ffprobe
+  YT_DLP_PATH: yt-dlp
+  DEMUCS_PATH: demucs
+  DEMUCS_MODEL: htdemucs
+  LOG_LEVEL: INFO
+
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: bass-tracker-backend:gpu
+  environment: *backend-environment
+  volumes:
+    - app-data:/data
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *backend
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn bass_tracker.main:app --host 0.0.0.0 --port 8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    environment:
+      <<: *backend-environment
+      DEMUCS_DEVICE: cuda
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    command:
+      - sh
+      - -c
+      - >-
+        python -c "import torch; assert torch.cuda.is_available(), 'CUDA GPU is required but unavailable'; print('CUDA ready:', torch.cuda.get_device_name(0))"
+        && exec bass-tracker-worker
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - app-data:/data
+      - model-cache:/root/.cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    image: bass-tracker-frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  model-cache:
