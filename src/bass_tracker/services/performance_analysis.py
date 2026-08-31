@@ -99,10 +99,15 @@ class PerformanceAnalysisProcessor:
 
 
 class HistoryService:
+    SECTION_TOLERANCE_SECONDS = 0.05  # 浮動小数の完全一致に依存しない (仕様14.6)
     def __init__(self, session: Session): self.session = session
-    def list(self, track_id: int | None, limit: int, offset: int):
+    def list(self, track_id: int | None, limit: int, offset: int, section_start: float | None = None, section_end: float | None = None, from_time=None, to_time=None):
         query = select(RecordingSession).order_by(RecordingSession.recorded_at.desc()).limit(limit).offset(offset)
         if track_id: query = query.where(RecordingSession.practice_track_id == track_id)
+        if section_start is not None: query = query.where(RecordingSession.section_start_seconds.between(section_start - self.SECTION_TOLERANCE_SECONDS, section_start + self.SECTION_TOLERANCE_SECONDS))
+        if section_end is not None: query = query.where(RecordingSession.section_end_seconds.between(section_end - self.SECTION_TOLERANCE_SECONDS, section_end + self.SECTION_TOLERANCE_SECONDS))
+        if from_time: query = query.where(RecordingSession.recorded_at >= from_time)
+        if to_time: query = query.where(RecordingSession.recorded_at <= to_time)
         items = []
         for recording in self.session.scalars(query):
             track = self.session.get(PracticeTrack, recording.practice_track_id); context = self.session.scalar(select(AnalysisContext).where(AnalysisContext.recording_session_id == recording.id).order_by(AnalysisContext.created_at.desc())); result = self.session.scalar(select(AnalysisResult).where(AnalysisResult.analysis_context_id == context.id)) if context else None

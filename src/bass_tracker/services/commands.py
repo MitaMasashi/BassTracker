@@ -69,5 +69,6 @@ class AudioCommands:
     def mix(self, sources: list[Path], destination: Path) -> None:
         command = [self.ffmpeg, "-y"]
         for source in sources: command.extend(["-i", str(source)])
-        command.extend(["-filter_complex", f"amix=inputs={len(sources)}:normalize=1", "-c:a", "pcm_s16le", str(destination)])
+        # normalize=0でStemの音量を保ち、PeakがClipする場合のみLimiterで抑える (仕様11.4)
+        command.extend(["-filter_complex", f"amix=inputs={len(sources)}:normalize=0,alimiter=limit=0.891:level=false", "-c:a", "pcm_s16le", str(destination)])
         self.runner.run(command)

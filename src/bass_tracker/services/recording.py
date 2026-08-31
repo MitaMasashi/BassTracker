@@ -1,5 +1,6 @@
 import shutil
 import wave
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -39,9 +40,11 @@ class RecordingService:
             self.session.rollback(); path.unlink(missing_ok=True); raise AppError("INVALID_RECORDING", "Uploaded file is not a valid WAV.", 400) from exc
         except Exception:
             self.session.rollback(); path.unlink(missing_ok=True); raise
-    def list_sessions(self, track_id: int | None, limit: int, offset: int):
+    def list_sessions(self, track_id: int | None, limit: int, offset: int, from_time: datetime | None = None, to_time: datetime | None = None):
         query = select(RecordingSession)
         if track_id: query = query.where(RecordingSession.practice_track_id == track_id)
+        if from_time: query = query.where(RecordingSession.recorded_at >= from_time)
+        if to_time: query = query.where(RecordingSession.recorded_at <= to_time)
         return list(self.session.scalars(query.order_by(RecordingSession.recorded_at.desc()).limit(limit).offset(offset)))
     def get_session(self, session_id: int):
         recording = self.session.get(RecordingSession, session_id)

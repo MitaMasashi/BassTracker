@@ -9,7 +9,7 @@ from bass_tracker.services.status import refresh_track_status
 
 class TrackService:
     def __init__(self, session: Session): self.session, self.repo = session, PracticeTrackRepository(session)
-    def list(self, limit: int, offset: int): return self.repo.list(limit, offset)
+    def list(self, limit: int, offset: int, status: str | None = None, source_type: str | None = None, q: str | None = None): return self.repo.list(limit, offset, status, source_type, q)
     def get(self, track_id: int):
         track = self.repo.get(track_id)
         if not track: raise AppError("TRACK_NOT_FOUND", "PracticeTrack was not found.", 404)

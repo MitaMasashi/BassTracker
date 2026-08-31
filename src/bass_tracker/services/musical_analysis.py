@@ -1,9 +1,10 @@
 import json
 import shutil
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from bass_tracker.config import get_settings
@@ -14,6 +15,29 @@ from bass_tracker.services.storage import FileStorage
 
 
 NOTES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+DEFAULT_PITCH_PARAMETERS = {"profile": "bass_5string_standard", "fmin": 28.0, "fmax": 500.0, "frame_length": 4096, "hop_length": 256, "candidate_count": 3, "stable_offset_seconds": 0.03, "window_seconds": 0.35}
+
+
+@dataclass(frozen=True)
+class ChordSegment:
+    start: float
+    end: float
+    chord: str
+    score: float
+
+
+def merge_chord_segments(segments: list[ChordSegment], min_duration_seconds: float) -> list[ChordSegment]:
+    """同一Chordの連続Segmentを統合し、Threshold未満の短いSegmentを前へ吸収する (仕様11.7)。"""
+    merged: list[ChordSegment] = []
+    for segment in segments:
+        if merged and merged[-1].chord == segment.chord:
+            merged[-1] = replace(merged[-1], end=segment.end, score=max(merged[-1].score, segment.score))
+        elif merged and (segment.end - segment.start) < min_duration_seconds:
+            merged[-1] = replace(merged[-1], end=segment.end)
+        else:
+            merged.append(segment)
+    return merged
 
 
 def midi_name(midi_note: int) -> str:
@@ -48,7 +72,7 @@ class StemSeparationProcessor:
         bass_mute_path = target_dir / "bass_mute.wav"; self.commands.mix([stems[name] for name in ("drums", "vocals", "other")], bass_mute_path); info = self.commands.probe(bass_mute_path)
         bass_mute = AudioAsset(practice_track_id=job.practice_track_id, origin_media_source_id=source.origin_media_source_id, parent_asset_id=source.id, asset_type="bass_mute", file_path=self.storage.relative(bass_mute_path), format="wav", sample_rate_hz=info.sample_rate_hz, channels=info.channels, duration_seconds=info.duration_seconds, processing_method="ffmpeg_amix", processing_version="normalize_1")
         self.session.add(bass_mute); self.session.flush(); self.session.add(ProcessingJobOutput(processing_job_id=job.id, audio_asset_id=bass_mute.id, role="bass_mute")); self.session.add(ProcessingJobInput(processing_job_id=job.id, audio_asset_id=source.id, role="source_audio"))
-        self.session.add(ProcessingJob(practice_track_id=job.practice_track_id, job_type="pitch_analysis", status="queued", parameters_json=json.dumps({"source_asset_id": outputs["bass"].id, "candidate_count": 3, "fmin": 28.0, "fmax": 500.0})))
+        self.session.add(ProcessingJob(practice_track_id=job.practice_track_id, job_type="pitch_analysis", status="queued", parameters_json=json.dumps({"source_asset_id": outputs["bass"].id, **DEFAULT_PITCH_PARAMETERS})))
 
 
 class LibrosaAnalysisProcessor:
@@ -62,19 +86,41 @@ class LibrosaAnalysisProcessor:
             chroma = librosa.feature.chroma_cqt(y=y, sr=sr).mean(axis=1); index = int(np.argmax(chroma)); track.musical_key = f"{NOTES[index]} major"; job.result_json = json.dumps({"musical_key": track.musical_key, "score": float(chroma[index] / max(chroma.sum(), 1e-9))})
         elif self.job_type == "chord_analysis":
             chroma = librosa.feature.chroma_cqt(y=y, sr=sr); duration = len(y) / sr
-            for index, start in enumerate(np.arange(0, duration, 2.0)):
-                frame_start = int(start / duration * chroma.shape[1]) if duration else 0; frame_end = max(frame_start + 1, int(min(start + 2, duration) / duration * chroma.shape[1])) if duration else 1; values = chroma[:, frame_start:frame_end].mean(axis=1); root = int(np.argmax(values)); score = float(values[root] / max(values.sum(), 1e-9)); chord = f"{NOTES[root]}"
-                self.session.add(ChordEvent(practice_track_id=job.practice_track_id, processing_job_id=job.id, start_seconds=float(start), end_seconds=float(min(start + 2, duration)), detected_chord=chord, selected_chord=chord, confidence=score))
+            window = float(params.get("window_seconds", 2.0)); merge_threshold = float(params.get("merge_threshold_seconds", 1.0))
+            segments: list[ChordSegment] = []
+            for start in np.arange(0, duration, window):
+                frame_start = int(start / duration * chroma.shape[1]) if duration else 0; frame_end = max(frame_start + 1, int(min(start + window, duration) / duration * chroma.shape[1])) if duration else 1; values = chroma[:, frame_start:frame_end].mean(axis=1); root = int(np.argmax(values))
+                segments.append(ChordSegment(float(start), float(min(start + window, duration)), NOTES[root], float(values[root] / max(values.sum(), 1e-9))))
+            merged = merge_chord_segments(segments, merge_threshold)
+            # ユーザー修正済みはDELETEも上書きもしない (仕様11.8)。旧自動推定だけを新Job結果で置き換える。
+            preserved = list(self.session.scalars(select(ChordEvent).where(ChordEvent.practice_track_id == job.practice_track_id, ChordEvent.is_user_corrected == True)))  # noqa: E712
+            self.session.execute(delete(ChordEvent).where(ChordEvent.practice_track_id == job.practice_track_id, ChordEvent.is_user_corrected == False))  # noqa: E712
+            for segment in merged:
+                if any(segment.start < kept.end_seconds and kept.start_seconds < segment.end for kept in preserved): continue
+                self.session.add(ChordEvent(practice_track_id=job.practice_track_id, processing_job_id=job.id, start_seconds=segment.start, end_seconds=segment.end, detected_chord=segment.chord, selected_chord=segment.chord, confidence=segment.score))
+            job.result_json = json.dumps({"window_seconds": window, "merge_threshold_seconds": merge_threshold, "segment_count": len(merged), "preserved_user_corrections": len(preserved)})
         elif self.job_type == "pitch_analysis":
-            onsets = librosa.onset.onset_detect(y=y, sr=sr, units="samples"); fmin, fmax = params.get("fmin", 28.0), params.get("fmax", 500.0)
+            merged_params = {**DEFAULT_PITCH_PARAMETERS, **params}
+            hop = int(merged_params["hop_length"]); frame = int(merged_params["frame_length"]); fmin, fmax = float(merged_params["fmin"]), float(merged_params["fmax"])
+            stable_offset = int(float(merged_params["stable_offset_seconds"]) * sr); window_samples = int(float(merged_params["window_seconds"]) * sr)
+            onsets = librosa.onset.onset_detect(y=y, sr=sr, units="samples", hop_length=hop, backtrack=True)
+            preserved = list(self.session.scalars(select(PitchEvent).where(PitchEvent.practice_track_id == job.practice_track_id, PitchEvent.is_user_corrected == True)))  # noqa: E712
+            self.session.execute(delete(PitchEvent).where(PitchEvent.practice_track_id == job.practice_track_id, PitchEvent.is_user_corrected == False))  # noqa: E712
             for sample in onsets:
-                segment = y[sample:min(len(y), sample + int(sr * .35))]; pitches, magnitudes = librosa.piptrack(y=segment, sr=sr, fmin=fmin, fmax=fmax); scores: dict[int, float] = {}
+                onset_seconds = float(sample / sr)
+                if any(abs(kept.onset_seconds - onset_seconds) < 0.05 for kept in preserved): continue
+                # Onset直後のAttackを避け、安定区間からPitch候補を抽出する (仕様5.10/11.11)
+                begin = min(len(y), sample + stable_offset); segment = y[begin:min(len(y), sample + window_samples)]
+                if len(segment) < frame // 4: segment = y[sample:min(len(y), sample + window_samples)]
+                if not len(segment): continue
+                pitches, magnitudes = librosa.piptrack(y=segment, sr=sr, fmin=fmin, fmax=fmax, n_fft=min(frame, max(256, len(segment))), hop_length=hop); scores: dict[int, float] = {}
                 for frequency, magnitude in zip(pitches.flat, magnitudes.flat):
                     if frequency > 0: scores[int(round(librosa.hz_to_midi(frequency)))] = max(scores.get(int(round(librosa.hz_to_midi(frequency))), 0), float(magnitude))
-                ranked = sorted(scores.items(), key=lambda pair: pair[1], reverse=True)[:params.get("candidate_count", 3)]
+                ranked = sorted(scores.items(), key=lambda pair: pair[1], reverse=True)[:int(merged_params["candidate_count"])]
                 if not ranked: continue
-                event = PitchEvent(practice_track_id=job.practice_track_id, processing_job_id=job.id, onset_seconds=float(sample / sr), end_seconds=float(min(len(y), sample + len(segment)) / sr), selected_pitch=midi_name(ranked[0][0]), selected_midi_note=ranked[0][0]); self.session.add(event); self.session.flush(); maximum = max(score for _, score in ranked)
+                event = PitchEvent(practice_track_id=job.practice_track_id, processing_job_id=job.id, onset_seconds=onset_seconds, end_seconds=float(min(len(y), sample + window_samples) / sr), selected_pitch=midi_name(ranked[0][0]), selected_midi_note=ranked[0][0]); self.session.add(event); self.session.flush(); maximum = max(score for _, score in ranked)
                 for rank, (midi_note, score) in enumerate(ranked, 1): self.session.add(PitchCandidate(pitch_event_id=event.id, rank=rank, pitch=midi_name(midi_note), midi_note=midi_note, frequency_hz=float(librosa.midi_to_hz(midi_note)), score=float(score / maximum)))
+            job.result_json = json.dumps({key: merged_params[key] for key in ("profile", "fmin", "fmax", "frame_length", "hop_length", "candidate_count")} | {"preserved_user_corrections": len(preserved)})
 
 
 class MusicalAnalysisService:

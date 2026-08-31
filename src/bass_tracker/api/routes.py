@@ -1,6 +1,7 @@
 from typing import Annotated
 
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import FileResponse
@@ -28,8 +29,8 @@ def health() -> dict[str, str]: return {"status": "ok"}
 
 
 @router.get("/practice-tracks", response_model=TrackListResponse, tags=["practice tracks"])
-def list_practice_tracks(session: DbSession, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)) -> TrackListResponse:
-    items, total = TrackService(session).list(limit, offset); return TrackListResponse(items=items, total=total)
+def list_practice_tracks(session: DbSession, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), track_status: str | None = Query(None, alias="status"), source_type: str | None = None, q: str | None = None) -> TrackListResponse:
+    items, total = TrackService(session).list(limit, offset, track_status, source_type, q); return TrackListResponse(items=items, total=total)
 
 
 @router.get("/practice-tracks/{track_id}", response_model=TrackResponse, tags=["practice tracks"])
@@ -137,7 +138,7 @@ async def create_recording(session: DbSession, file: UploadFile = File(...), met
 
 
 @router.get("/recording-sessions", response_model=list[RecordingSessionResponse], tags=["recording"])
-def recording_sessions(session: DbSession, practice_track_id: int | None = None, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)): return RecordingService(session, default_import_dependencies(session)[0]).list_sessions(practice_track_id, limit, offset)
+def recording_sessions(session: DbSession, practice_track_id: int | None = None, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), from_time: datetime | None = Query(None, alias="from"), to_time: datetime | None = Query(None, alias="to")): return RecordingService(session, default_import_dependencies(session)[0]).list_sessions(practice_track_id, limit, offset, from_time, to_time)
 
 
 @router.get("/recording-sessions/{session_id}", response_model=RecordingSessionResponse, tags=["recording"])
@@ -164,4 +165,4 @@ def note_events(result_id: int, session: DbSession):
 
 
 @router.get("/history", response_model=list[HistoryItem], tags=["history"])
-def history(session: DbSession, practice_track_id: int | None = None, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0)): return HistoryService(session).list(practice_track_id, limit, offset)
+def history(session: DbSession, practice_track_id: int | None = None, limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0), section_start_seconds: float | None = None, section_end_seconds: float | None = None, from_time: datetime | None = Query(None, alias="from"), to_time: datetime | None = Query(None, alias="to")): return HistoryService(session).list(practice_track_id, limit, offset, section_start_seconds, section_end_seconds, from_time, to_time)
