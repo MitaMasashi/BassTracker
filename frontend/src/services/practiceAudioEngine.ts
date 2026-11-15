@@ -1,4 +1,5 @@
 import { clickWaveform, roundtripLatencyMs } from "./calibration";
+import { stretchAudioBuffer } from "./stretchAudioBuffer";
 import { countInDuration } from "./timeline";
 import { encodeWav } from "./wav";
 
@@ -9,7 +10,10 @@ const CALIBRATION_HZ = 1000;
 
 export interface PracticeStartOptions {
   deviceId: string;
+  /** 再生する伴奏。prepare() 済みなら bufferSpeed 倍速へピッチ維持で変換済み。 */
   buffer: AudioBuffer | null;
+  /** buffer が既に時間伸縮されている倍率 (原音のままなら1)。 */
+  bufferSpeed?: number;
   sectionStartSeconds: number;
   sectionEndSeconds: number;
   playbackSpeed: number;
@@ -49,6 +53,20 @@ export function concatSamples(chunks: Float32Array[]): Float32Array {
   return merged;
 }
 
+/**
+ * 原音の区間 [sectionStart, sectionEnd] を伸縮済みBuffer上の位置へ変換する。
+ * 伸縮済みBufferでは原音時刻 t が t / bufferSpeed に位置する。
+ * playbackRate が1でなくなるのは未変換Bufferを渡した場合だけ (ピッチも変わる)。
+ */
+export function accompanimentPlayback(options: Pick<PracticeStartOptions, "sectionStartSeconds" | "sectionEndSeconds" | "playbackSpeed" | "bufferSpeed">) {
+  const bufferSpeed = options.bufferSpeed ?? 1;
+  return {
+    playbackRate: options.playbackSpeed / bufferSpeed,
+    offsetSeconds: options.sectionStartSeconds / bufferSpeed,
+    durationSeconds: Math.max(0, options.sectionEndSeconds - options.sectionStartSeconds) / bufferSpeed,
+  };
+}
+
 export class PracticeAudioEngine {
   private context?: AudioContext;
   private workletReady = false;
@@ -85,6 +103,11 @@ export class PracticeAudioEngine {
     const context = this.ensureContext();
     const encoded = await fetch(url).then((response) => response.arrayBuffer());
     return context.decodeAudioData(encoded);
+  }
+
+  /** 伴奏をピッチ維持のまま speed 倍速へ事前変換する。練習中に計算しないためREC前に呼ぶ。 */
+  prepare(buffer: AudioBuffer, speed: number): Promise<AudioBuffer> {
+    return stretchAudioBuffer(this.ensureContext(), buffer, speed);
   }
 
   private async openCapture(deviceId: string): Promise<Capture> {
@@ -143,10 +166,11 @@ export class PracticeAudioEngine {
     }
     if (options.buffer) {
       const node = context.createBufferSource();
+      const playback = accompanimentPlayback(options);
       node.buffer = options.buffer;
-      node.playbackRate.value = options.playbackSpeed;
+      node.playbackRate.value = playback.playbackRate;
       node.connect(context.destination);
-      node.start(begin + countIn, options.sectionStartSeconds, Math.max(0, options.sectionEndSeconds - options.sectionStartSeconds));
+      node.start(begin + countIn, playback.offsetSeconds, playback.durationSeconds);
       this.accompaniment = node;
     }
     this.anchor = begin;

@@ -41,6 +41,13 @@ def test_track_api_patch_errors_and_job_retry(tmp_path: Path) -> None:
             assert client.get("/api/practice-tracks").json()["total"] == 1
             patched = client.patch(f"/api/practice-tracks/{track.id}", json={"display_title": "Updated"})
             assert patched.json()["display_title"] == "Updated"
+            musical = client.patch(f"/api/practice-tracks/{track.id}", json={"bpm": 96.5, "musical_key": "E minor", "time_signature_numerator": 6, "time_signature_denominator": 8, "song_title": None})
+            assert musical.status_code == 200
+            body = musical.json()
+            assert (body["bpm"], body["musical_key"], body["time_signature_numerator"], body["time_signature_denominator"], body["song_title"]) == (96.5, "E minor", 6, 8, None)
+            null_title = client.patch(f"/api/practice-tracks/{track.id}", json={"display_title": None})
+            assert null_title.status_code == 422
+            assert null_title.json()["error"]["code"] == "INVALID_TRACK_PATCH"
             missing = client.get("/api/practice-tracks/999")
             assert missing.status_code == 404
             assert missing.json()["error"]["code"] == "TRACK_NOT_FOUND"

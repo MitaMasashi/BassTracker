@@ -16,7 +16,9 @@ class TrackService:
         return track
     def update(self, track_id: int, patch: TrackPatch):
         track = self.get(track_id)
-        for key, value in patch.model_dump(exclude_unset=True).items(): setattr(track, key, value)
+        values = patch.model_dump(exclude_unset=True)
+        if "display_title" in values and values["display_title"] is None: raise AppError("INVALID_TRACK_PATCH", "display_title cannot be null.", 422)
+        for key, value in values.items(): setattr(track, key, value)
         self.session.commit(); refresh_track_status(self.session, track_id); self.session.refresh(track); return track
 
 

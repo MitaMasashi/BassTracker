@@ -22,6 +22,8 @@ class TrackResponse(BaseModel):
     duration_seconds: float | None
     bpm: float | None
     musical_key: str | None
+    time_signature_numerator: int | None
+    time_signature_denominator: int | None
     status: str
 
 

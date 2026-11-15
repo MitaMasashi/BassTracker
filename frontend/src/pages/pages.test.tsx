@@ -10,7 +10,7 @@ import { api } from "../api/client";
 
 vi.mock("../api/client", async () => {
   const actual = await vi.importActual<typeof import("../api/client")>("../api/client");
-  return { ...actual, api: { tracks: vi.fn(), jobs: vi.fn(), retryJob: vi.fn(), history: vi.fn() } };
+  return { ...actual, api: { tracks: vi.fn(), jobs: vi.fn(), retryJob: vi.fn(), history: vi.fn(), patchTrack: vi.fn() } };
 });
 
 const mocked = vi.mocked(api, true);
@@ -89,6 +89,35 @@ describe("LibraryPage", () => {
     ]);
     renderWithLayout("/tracks");
     await waitFor(() => expect(screen.getAllByTitle("再試行")).toHaveLength(1));
+  });
+
+  it("edits track info and shows the saved values", async () => {
+    mocked.tracks.mockResolvedValue({ items: [track], total: 1 });
+    mocked.jobs.mockResolvedValue([]);
+    mocked.patchTrack.mockImplementation(async (_id, body) => ({ ...track, ...body, display_title: body.display_title ?? track.display_title }));
+    renderWithLayout("/tracks");
+    await userEvent.click(await screen.findByRole("button", { name: /情報を編集/ }));
+    const bpm = screen.getByLabelText("BPM");
+    await userEvent.clear(bpm);
+    await userEvent.type(bpm, "96.5");
+    await userEvent.type(screen.getByLabelText("拍子の分子"), "6");
+    await userEvent.selectOptions(screen.getByLabelText("拍子の分母"), "8");
+    await userEvent.clear(screen.getByLabelText(/曲名/));
+    await userEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(mocked.patchTrack).toHaveBeenCalledWith(7, { display_title: "Sample Song", song_title: null, artist_name: "Artist A", bpm: 96.5, musical_key: "E minor", time_signature_numerator: 6, time_signature_denominator: 8 }));
+    expect(await screen.findByText("曲情報を保存しました")).toBeInTheDocument();
+    expect(screen.getByText("6/8")).toBeInTheDocument();
+  });
+
+  it("rejects a time signature with only one side filled", async () => {
+    mocked.tracks.mockResolvedValue({ items: [track], total: 1 });
+    mocked.jobs.mockResolvedValue([]);
+    renderWithLayout("/tracks");
+    await userEvent.click(await screen.findByRole("button", { name: /情報を編集/ }));
+    await userEvent.type(screen.getByLabelText("拍子の分子"), "3");
+    await userEvent.click(screen.getByRole("button", { name: /保存/ }));
+    expect(await screen.findByText("拍子は分子と分母の両方を指定してください")).toBeInTheDocument();
+    expect(mocked.patchTrack).not.toHaveBeenCalled();
   });
 
   it("points the sidebar at the selected track", async () => {

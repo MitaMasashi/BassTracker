@@ -13,7 +13,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.status === 204 ? undefined as T : response.json();
 }
 
-export interface ApiTrack { id: number; display_title: string; song_title: string | null; artist_name: string | null; duration_seconds: number | null; bpm: number | null; musical_key: string | null; status: string }
+export interface ApiTrack { id: number; display_title: string; song_title: string | null; artist_name: string | null; duration_seconds: number | null; bpm: number | null; musical_key: string | null; time_signature_numerator?: number | null; time_signature_denominator?: number | null; status: string }
+export interface TrackPatch { display_title?: string; song_title?: string | null; artist_name?: string | null; bpm?: number | null; musical_key?: string | null; time_signature_numerator?: number | null; time_signature_denominator?: number | null }
 export interface ApiJob { id: number; practice_track_id: number; job_type: string; status: string; error_message: string | null }
 export interface ApiAsset { id: number; practice_track_id: number; asset_type: string; file_path: string; format: string; sample_rate_hz: number | null; channels: number | null; duration_seconds: number | null }
 export interface ApiRecording { id: number; practice_track_id: number; recording_audio_asset_id: number; section_start_seconds: number; section_end_seconds: number; playback_speed: number; count_in_bars: number; sample_rate_hz: number; audio_input_device_id: string | null; audio_output_device_id: string | null; latency_calibration_id: number | null; recorded_at: string }
@@ -36,6 +37,7 @@ const jsonInit = (method: string, body: object): RequestInit => ({ method, heade
 
 export const api = {
   tracks: () => request<{ items: ApiTrack[]; total: number }>("/practice-tracks"),
+  patchTrack: (trackId: number, body: TrackPatch) => request<ApiTrack>(`/practice-tracks/${trackId}`, jsonInit("PATCH", body)),
   jobs: (trackId: number) => request<ApiJob[]>(`/practice-tracks/${trackId}/jobs`),
   job: (jobId: number) => request<ApiJob>(`/jobs/${jobId}`),
   retryJob: (jobId: number) => request<ApiJob>(`/jobs/${jobId}/retry`, { method: "POST" }),

@@ -24,6 +24,8 @@ export function PracticePage() {
   const [accompaniment, setAccompaniment] = useState("bass_mute");
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null);
   const [preloading, setPreloading] = useState(false);
+  const [prepared, setPrepared] = useState<{ source: AudioBuffer; speed: number; buffer: AudioBuffer } | null>(null);
+  const stretchCache = useRef(new Map<number, AudioBuffer>());
   const [speed, setSpeed] = useState(1);
   const [countInBars, setCountInBars] = useState(2);
   const [useRange, setUseRange] = useState(true);
@@ -47,7 +49,9 @@ export function PracticePage() {
   const duration = buffer?.duration ?? 0;
   const section = useRange ? range : { start: 0, end: duration };
   const calibration = calibrations.find((item) => item.id === calibrationId);
-  const ready = Boolean(buffer) && Boolean(deviceId) && section.end > section.start;
+  const playable = prepared && prepared.source === buffer && prepared.speed === speed ? prepared.buffer : null;
+  const preparing = Boolean(buffer) && !playable;
+  const ready = Boolean(playable) && Boolean(deviceId) && section.end > section.start;
 
   useEffect(() => { selectTrack(trackId); api.musicalAnalysis(trackId).then(setSummary).catch(() => setMessage("楽曲情報を取得できませんでした")); }, [trackId]);
 
@@ -68,6 +72,29 @@ export function PracticePage() {
       .finally(() => { if (active) setPreloading(false); });
     return () => { active = false; };
   }, [assetId]);
+
+  // 速度変更はピッチを保ったまま伴奏を事前変換する (再生中に計算しない)
+  useEffect(() => {
+    stretchCache.current.clear();
+    setPrepared(null);
+  }, [buffer]);
+
+  useEffect(() => {
+    if (!buffer) return;
+    const cached = stretchCache.current.get(speed);
+    if (cached) { setPrepared({ source: buffer, speed, buffer: cached }); return; }
+    let active = true;
+    if (speed !== 1) setMessage(`ピッチを保ったまま${Math.round(speed * 100)}%へ変換中...`);
+    engine.current.prepare(buffer, speed)
+      .then((stretched) => {
+        stretchCache.current.set(speed, stretched);
+        if (!active) return;
+        setPrepared({ source: buffer, speed, buffer: stretched });
+        if (speed !== 1) setMessage(`${Math.round(speed * 100)}%の伴奏を準備しました (ピッチ維持)`);
+      })
+      .catch((error: Error) => { if (active) setMessage(`速度変換に失敗しました: ${error.message}`); });
+    return () => { active = false; };
+  }, [buffer, speed]);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -94,7 +121,7 @@ export function PracticePage() {
     if (!recording) {
       if (!ready) { setMessage("伴奏のロードとInput選択が必要です"); return; }
       setElapsed(0);
-      await engine.current.start({ deviceId, buffer, sectionStartSeconds: section.start, sectionEndSeconds: section.end, playbackSpeed: speed, countInBars, bpm, beatsPerBar });
+      await engine.current.start({ deviceId, buffer: playable, bufferSpeed: speed, sectionStartSeconds: section.start, sectionEndSeconds: section.end, playbackSpeed: speed, countInBars, bpm, beatsPerBar });
       setRecording(true);
       setMessage("録音中");
       return;
@@ -158,7 +185,7 @@ export function PracticePage() {
           <Waveform buffer={buffer} compact loopStart={useRange ? section.start : null} loopEnd={useRange ? section.end : null} />
           <div className="practice-controls">
             <label>伴奏<select value={accompaniment} onChange={(event) => setAccompaniment(event.target.value)}>{ACCOMPANIMENT.map((item) => <option key={item.value} value={item.value} disabled={!summary.assets[item.value]}>{item.label}</option>)}</select></label>
-            <label>速度<select value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>{SPEEDS.map((value) => <option key={value} value={value}>{value * 100}%</option>)}</select></label>
+            <label>速度<select value={speed} disabled={recording} onChange={(event) => setSpeed(Number(event.target.value))}>{SPEEDS.map((value) => <option key={value} value={value}>{value * 100}%</option>)}</select></label>
             <label className="toggle"><input type="checkbox" checked={useRange} onChange={(event) => setUseRange(event.target.checked)} /><span />A-B区間</label>
             <label>A<input type="number" min={0} step={0.1} disabled={!useRange} value={range.start} onChange={(event) => setRange({ ...range, start: Number(event.target.value) })} /></label>
             <label>B<input type="number" min={0} step={0.1} disabled={!useRange} value={range.end} onChange={(event) => setRange({ ...range, end: Number(event.target.value) })} /></label>
@@ -171,7 +198,7 @@ export function PracticePage() {
           </section>
         </section>
         <aside className="panel record-panel">
-          <div className="panel-title"><h3>Recording</h3><span className={recording ? "live" : ""}>{recording ? "REC" : ready ? "READY" : "LOADING"}</span></div>
+          <div className="panel-title"><h3>Recording</h3><span className={recording ? "live" : ""}>{recording ? "REC" : ready ? "READY" : preparing ? "PREPARING" : "LOADING"}</span></div>
           <div className="input-meter"><i style={{ width: `${Math.min(100, level * 300)}%` }} /></div>
           <button disabled={!ready} className={`record-button ${recording ? "recording" : ""}`} onClick={() => toggleRecording().catch((error) => setMessage(error.message))}><Mic2 /><span>{recording ? "STOP" : "REC"}</span></button>
           <strong className="record-time">{formatClock(elapsed)}</strong>
