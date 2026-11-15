@@ -1,4 +1,22 @@
+# Python
 __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
+
+# テスト実行時の一時ディレクトリ (pytest --basetemp 等)
+.pytest-*/
+.migration-test/
+
+# ローカルのDB・音源ストレージ・一時ファイル
+data/
+*.db
+*.db-journal
+
+# 環境設定 (.env.example のみ管理する)
+.env
+
+# Frontend: 依存パッケージとビルド成果物 (npm ci / npm run build で再生成)
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
